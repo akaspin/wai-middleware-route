@@ -53,4 +53,4 @@ method &~~ pattern = onPath method $ (=~ pattern) . rawPathInfo
     where
         onPath :: Method -> Rule -> Rule       
         onPath "*" p = p
-        onPath m p = (&&) <$> ((==m) . requestMethod) <*> p
+        onPath m p = (&&) <$> (==m) . requestMethod <*> p
