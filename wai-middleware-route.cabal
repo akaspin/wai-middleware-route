@@ -1,5 +1,5 @@
 name:           wai-middleware-route
-version:        0.1.0.1
+version:        0.1.0.2
 cabal-version:  >= 1.8
 build-type:     Simple
 synopsis:       Wai dispatch middleware
@@ -12,6 +12,10 @@ maintainer:     aka.spin@gmail.com
 license-file:   LICENSE
 homepage:       https://github.com/akaspin/wai-middleware-route
 
+Source-repository head
+  type:            git
+  location:        git://github.com/akaspin/wai-middleware-route.git
+
 library
   hs-source-dirs:  src
   build-depends:   
@@ -20,6 +24,6 @@ library
                    bytestring >= 0.9 && < 0.10,
                    regex-posix >= 0.94.4,
                    http-types >= 0.6 && < 0.7
-  ghc-options:     -Wall
+  ghc-options:     -Wall -rtsopts
   exposed-modules: Network.Wai.Middleware.Route
 
