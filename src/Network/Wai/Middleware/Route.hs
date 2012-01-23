@@ -6,22 +6,21 @@ It's Heavy inspired by @vhost@ middleware from @wai-extra@ but
 gives some sugar to life.
 -}
 
-module Network.Wai.Middleware.Route where
+module Network.Wai.Middleware.Route (
+    -- * Dispatching
+    dispatch, 
+    -- * Creating rules
+    rule
+) where
 
-import Data.List
+import Data.List (find)
 import Data.ByteString (ByteString)
 import Text.Regex.Posix ((=~))
-import Control.Applicative
+import Control.Applicative ((<$>), (<*>))
 import Network.HTTP.Types (Method)
-import Network.Wai
+import Network.Wai (Request, Application, rawPathInfo, requestMethod)
 
--- | Routing rule 
-type Rule = Request -> Bool
-
--- | Route for dispatch
-type Route = (Rule, Application)
-
-{- | Dispatch. Seek for first route where the 'Rule' gives a positive result.
+{- | Dispatch. Seek for first route where the \"rule\" gives a positive result.
 Uses 'find' instead 'filter' in @vhost@
 
 > dispatch [
@@ -30,10 +29,11 @@ Uses 'find' instead 'filter' in @vhost@
 >   ] defaultApp
 -}
 dispatch :: 
-       [Route]      -- ^ List of routes
+       [(Request -> Bool, Application)]      
+                    -- ^ List of routes
     -> Application  -- ^ Default 'Application' 
     -> Application  -- ^ Returns founded 'Application'. If not found - returns
-                    -- default.
+                    --   default.
 dispatch routes def req =  
     case find (\(b, _) -> b req) routes of
         Nothing -> def req
@@ -42,15 +42,16 @@ dispatch routes def req =
 {- | Syntax shugar for most frequently case: HTTP Method and Request path 
 regex pattern.
 
-> ("GET" &~~ "^/issues", app)
+> ("*" `rule` "^/issues/any", app)
+> (methodGet `rule` "^/issues", app)
 -}
-(&~~) :: 
-       Method       -- ^ HTTP Method 
+rule :: 
+       Method       -- ^ HTTP Method. Use '\"*\"' for any method
     -> ByteString   -- ^ Request path pattern. 
-    -> Rule         -- ^ Routing rule
-infixl 1 &~~
-method &~~ pattern = onPath method $ (=~ pattern) . rawPathInfo
+    -> Request      -- ^ Request 
+    -> Bool         -- ^ Routing rule
+rule method pattern = onPath method $ (=~ pattern) . rawPathInfo
     where
-        onPath :: Method -> Rule -> Rule       
+        onPath :: Method -> (Request -> Bool) -> Request -> Bool
         onPath "*" p = p
         onPath m p = (&&) <$> (==m) . requestMethod <*> p
