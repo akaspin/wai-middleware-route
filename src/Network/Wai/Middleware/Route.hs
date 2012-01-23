@@ -43,10 +43,10 @@ dispatch routes def req =
 regex pattern.
 
 > ("*" `rule` "^/issues/any", app)
-> (methodGet `rule` "^/issues", app)
+> (methodGet `rule` "^/issues", anotherApp)
 -}
 rule :: 
-       Method       -- ^ HTTP Method. Use '\"*\"' for any method
+       Method       -- ^ HTTP Method. Use @\"*\"@ for any method
     -> ByteString   -- ^ Request path pattern. 
     -> Request      -- ^ Request 
     -> Bool         -- ^ Routing rule
