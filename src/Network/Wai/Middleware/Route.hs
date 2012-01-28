@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns #-}
 
 {- | Route middleware for wai.
 
@@ -10,15 +10,17 @@ module Network.Wai.Middleware.Route (
     -- * Dispatching
     dispatch, 
     -- * Creating rules
-    rule
+    onRegex,
+    onPrefix,
+    onExact
 ) where
 
 import Data.List (find)
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString, isPrefixOf)
 import Text.Regex.Posix ((=~))
 import Control.Applicative ((<$>), (<*>))
 import Network.HTTP.Types (Method)
-import Network.Wai (Request, Application, rawPathInfo, requestMethod)
+import Network.Wai (Request(..), Application)
 
 {- | Dispatch. Seek for first route where the \"rule\" gives a positive result.
 Uses 'find' instead 'filter' in @vhost@
@@ -36,22 +38,49 @@ dispatch ::
                     --   default.
 dispatch routes def req =  
     case find (\(b, _) -> b req) routes of
-        Nothing -> def req
         Just (_, app) -> app req
+        Nothing -> def req
 
-{- | Syntax shugar for most frequently case: HTTP Method and Request path 
-regex pattern.
-
-> ("*" `rule` "^/issues/any", app)
-> (methodGet `rule` "^/issues", anotherApp)
--}
-rule :: 
+-- | Most frequently case: HTTP Method and Request path regex pattern.
+--
+-- > ("*" `rule` "^/issue/", app)
+-- > (methodGet `rule` "^/issues$", anotherApp)
+onRegex :: 
        Method       -- ^ HTTP Method. Use @\"*\"@ for any method
     -> ByteString   -- ^ Request path pattern. 
     -> Request      -- ^ Request 
+    -> Bool
+onRegex method needle = 
+    withMethod method $ (=~ needle) . rawPathInfo
+    
+-- | HTTP Method and Request path prefix.
+--
+-- > ("*" `rule` "^/issue/", app)
+-- > (methodGet `rule` "^/issues$", anotherApp)
+onPrefix :: 
+       Method       -- ^ HTTP Method. Use @\"*\"@ for any method
+    -> ByteString   -- ^ Request path prefix. 
+    -> Request      -- ^ Request 
     -> Bool         -- ^ Routing rule
-rule method pattern = onPath method $ (=~ pattern) . rawPathInfo
-    where
-        onPath :: Method -> (Request -> Bool) -> Request -> Bool
-        onPath "*" p = p
-        onPath m p = (&&) <$> (==m) . requestMethod <*> p
+onPrefix method needle = 
+    withMethod method $ (needle `isPrefixOf`) . rawPathInfo
+
+-- | HTTP Method and Request path.
+--
+-- > ("*" `rule` "^/issue/", app)
+-- > (methodGet `rule` "^/issues$", anotherApp)
+onExact :: 
+       Method       -- ^ HTTP Method. Use @\"*\"@ for any method
+    -> ByteString   -- ^ Request path. 
+    -> Request      -- ^ Request 
+    -> Bool         -- ^ Routing rule
+onExact method needle = 
+    withMethod method $ (needle ==) . rawPathInfo
+
+withMethod :: 
+       Method
+    -> (Request -> Bool) 
+    -> Request 
+    -> Bool
+withMethod "*" p = p
+withMethod m p = (&&) <$> (== m) . requestMethod <*> p
