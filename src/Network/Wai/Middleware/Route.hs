@@ -151,8 +151,10 @@ mkGenRoute m hasMulti pieces =
 -- | Make Pieces from path
 mkPieces :: T.Text -> [D.Piece]
 mkPieces = 
-    map chunk . T.split (=='/')
+    map chunk . protPath . T.split (=='/')
   where
+    protPath [""] = []
+    protPath p = p
     chunk "" = D.Dynamic
     chunk c = D.Static c
 {-# INLINE mkPieces #-}
