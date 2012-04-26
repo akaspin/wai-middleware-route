@@ -26,26 +26,72 @@ import Data.Text.Encoding (decodeUtf8)
 import Network.Wai (Application, requestMethod, pathInfo)
 import qualified Yesod.Routes.Dispatch as D
 
--- | Rule for route. 
+-- | Rule for route. Rules without single quotes (@'@) means fixed length
+--   paths. And vice versa, rules with single quotes (@'@) means paths with
+--   variable lengh 
+--
+--   Paths converts to 'D.Piece's by following rules:
+--   
+--   * Paths splits by slashes (@/@).
+--   
+--   * Text between slashes becomes 'D.Static' 'D.Piece'. The same thing 
+--     happens with the text at the ends of paths.
+--
+--   * Double (triple, etc.) slashes means becomes 'D.Dynamic' 'D.Piece's. 
+--     The same thing happens with the slashes at the ends of paths.
+--
+-- > "foo"
+-- > [Static "foo"]
+-- > 
+-- > "foo/bar"
+-- > [Static "foo", Static "bar"]
+-- > 
+-- > "foo//bar"
+-- > [Static "foo", Dynamic, Static "bar"]
+-- > 
+-- > "/foo//bar/baz/"
+-- > [Dynamic, Static "foo", Dynamic, Static "bar", Static "baz", Dynamic]
+-- > 
+
 data Rule = 
     Get T.Text Application
+        -- ^ @GET@,  fixed length path
   | Post T.Text Application
+        -- ^ @POST@, fixed length path
   | Head T.Text Application
+        -- ^ @HEAD@, fixed length path
   | Put T.Text Application
+        -- ^ @PUT@, fixed length path
   | Delete T.Text Application
+        -- ^ @DELETE@, fixed length path
   | Trace T.Text Application
+        -- ^ @TRACE@, fixed length path
   | Connect T.Text Application
+        -- ^ @CONNECT@, fixed length path
   | Options T.Text Application
+        -- ^ @OPTIONS@, fixed length path
   | Any T.Text Application
+        -- ^ Any @HTTP@ method, fixed length path
   | Get' T.Text Application
+        -- ^ @GET@, variable length path
   | Post' T.Text Application
+        -- ^ @POST@, variable length path
   | Head' T.Text Application
+        -- ^ @HEAD@, variable length path
   | Put' T.Text Application
+        -- ^ @PUT@, variable length path
   | Delete' T.Text Application
+        -- ^ @DELETE@, variable length path
   | Trace' T.Text Application
+        -- ^ @TRACE@, variable length path
   | Connect' T.Text Application
+        -- ^ @CONNECT@, variable length path
   | Options' T.Text Application
+        -- ^ @OPTIONS@, variable length path
   | Any' T.Text Application
+        -- ^ Any @HTTP@ method, variable length path
+  | Gen Bool T.Text T.Text Application
+        -- ^ Generic rule with path lenghts flag, @HTTP@ method and path
 
 -- | Make 'D.Route's from 'Rules'. 
 --   
@@ -66,6 +112,9 @@ mkRoutes' = D.toDispatch . mkRoutes
 -- | Make 'D.Route' from 'Rule'. 'D.rhPieces' of 'D.Route' will be
 --   prepended with 'D.Piece' with corresponding @HTTP@ method. 
 --   'D.Static' means concrete method. 'D.Dynamic' means any method.
+--
+-- > mkRoute $ Get "foo/bar" app
+-- > Route [Static "foo", Static "bar"] False (const $ Just app) 
 mkRoute :: Rule -> D.Route Application
 mkRoute (Get p a) = mkGenRoute (D.Static "GET") False p a
 mkRoute (Post p a) = mkGenRoute (D.Static "POST") False p a
@@ -85,6 +134,7 @@ mkRoute (Trace' p a) = mkGenRoute (D.Static "TRACE") True p a
 mkRoute (Connect' p a) = mkGenRoute (D.Static "CONNECT") True p a
 mkRoute (Options' p a) = mkGenRoute (D.Static "OPTIONS") True p a
 mkRoute (Any' p a) = mkGenRoute D.Dynamic True p a
+mkRoute (Gen v m p a) = mkGenRoute (D.Static m) v p a
 {-# INLINE mkRoute #-} 
 
 -- | Make generic route
@@ -117,7 +167,7 @@ mkPieces =
 -- > rs = toDispatch . mkRoutes [
 -- >      Get  "foo"  fooGetApp
 -- >    , Post "foo"  fooPostApp
--- >    , Get' "foo/" fooGetDynApp
+-- >    , Get "foo//bar" fooDynBarApp
 -- > 
 -- >    , Any  "any"  anyMethodApp
 -- >    ]
