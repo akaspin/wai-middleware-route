@@ -38,7 +38,11 @@ test-suite test
                    test-framework-quickcheck2,
                    test-framework-hunit,
 
-                   text
+                   http-types,
+                   text,
+                   wai,
+                   wai-test,
+                   wai-middleware-route
   ghc-options:     -Wall -rtsopts
   hs-source-dirs:  test
   main-is:         Main.hs

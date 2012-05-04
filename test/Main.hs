@@ -8,6 +8,10 @@ import Test.HUnit (Assertion, (@=?))
 
 import qualified Data.Text as T 
 
+import Network.Wai (Application, responseLBS)
+import Network.Wai.Test
+import qualified Network.HTTP.Types as H
+
 main :: IO ()
 main = defaultMain [
         testCase "Split Text" caseSplitText
@@ -21,3 +25,4 @@ caseSplitText = do
     ["", "a", "", "b", ""] @=? sp "/a//b/"
   where
     sp = T.split (=='/')
+    
