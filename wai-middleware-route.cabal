@@ -1,5 +1,5 @@
 name:           wai-middleware-route
-version:        0.5.1
+version:        0.6.0
 cabal-version:  >= 1.8
 build-type:     Simple
 synopsis:       Wai dispatch middleware
@@ -37,7 +37,7 @@ test-suite test
                    test-framework >= 0.4.1,
                    test-framework-quickcheck2,
                    test-framework-hunit,
-
+                   bytestring >= 0.9 && < 0.10,
                    http-types,
                    text,
                    wai,

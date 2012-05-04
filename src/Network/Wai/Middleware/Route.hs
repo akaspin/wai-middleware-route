@@ -37,61 +37,35 @@ import qualified Yesod.Routes.Dispatch as D
 --   * Text between slashes becomes 'D.Static' 'D.Piece'. The same thing 
 --     happens with the text at the ends of paths.
 --
---   * Double (triple, etc.) slashes means becomes 'D.Dynamic' 'D.Piece's. 
---     The same thing happens with the slashes at the ends of paths.
+--   * Hashes (@#@) inside slashes becomes 'D.Dynamic' 'D.Piece's.
+--
+--   * To make route with variable length just add asterisk (@\*@) after last
+--     slash.
 --
 -- > "foo"
--- > [Static "foo"]
+-- > [Static "foo"] Fixed
 -- > 
 -- > "foo/bar"
--- > [Static "foo", Static "bar"]
+-- > [Static "foo", Static "bar"] Fixed
 -- > 
--- > "foo//bar"
--- > [Static "foo", Dynamic, Static "bar"]
+-- > "foo/#/bar"
+-- > [Static "foo", Dynamic, Static "bar"] Fixed
 -- > 
--- > "/foo//bar/baz/"
--- > [Dynamic, Static "foo", Dynamic, Static "bar", Static "baz", Dynamic]
--- > 
+-- > "foo/#/bar/baz/*"
+-- > [Dynamic, Static "foo", Dynamic, Static "bar", Static "baz"] Variable
 
 data Rule = 
-    Get T.Text Application
-        -- ^ @GET@,  fixed length path
-  | Post T.Text Application
-        -- ^ @POST@, fixed length path
-  | Head T.Text Application
-        -- ^ @HEAD@, fixed length path
-  | Put T.Text Application
-        -- ^ @PUT@, fixed length path
-  | Delete T.Text Application
-        -- ^ @DELETE@, fixed length path
-  | Trace T.Text Application
-        -- ^ @TRACE@, fixed length path
-  | Connect T.Text Application
-        -- ^ @CONNECT@, fixed length path
-  | Options T.Text Application
-        -- ^ @OPTIONS@, fixed length path
-  | Any T.Text Application
-        -- ^ Any @HTTP@ method, fixed length path
-  | Get' T.Text Application
-        -- ^ @GET@, variable length path
-  | Post' T.Text Application
-        -- ^ @POST@, variable length path
-  | Head' T.Text Application
-        -- ^ @HEAD@, variable length path
-  | Put' T.Text Application
-        -- ^ @PUT@, variable length path
-  | Delete' T.Text Application
-        -- ^ @DELETE@, variable length path
-  | Trace' T.Text Application
-        -- ^ @TRACE@, variable length path
-  | Connect' T.Text Application
-        -- ^ @CONNECT@, variable length path
-  | Options' T.Text Application
-        -- ^ @OPTIONS@, variable length path
-  | Any' T.Text Application
-        -- ^ Any @HTTP@ method, variable length path
-  | Gen Bool T.Text T.Text Application
-        -- ^ Generic rule with path lenghts flag, @HTTP@ method and path
+    Get T.Text Application          -- ^ @GET@ method
+  | Post T.Text Application         -- ^ @POST@ method
+  | Head T.Text Application         -- ^ @HEAD@ method
+  | Put T.Text Application          -- ^ @PUT@ method
+  | Delete T.Text Application       -- ^ @DELETE@ method
+  | Trace T.Text Application        -- ^ @TRACE@ method
+  | Connect T.Text Application      -- ^ @CONNECT@ method
+  | Options T.Text Application      -- ^ @OPTIONS@ method
+  | Any T.Text Application          -- ^ Any @HTTP@ method
+  | Gen T.Text T.Text Application
+        -- ^ Generic rule with @HTTP@ method and path
 
 -- | Make 'D.Route's from 'Rules'. 
 --   
@@ -116,48 +90,51 @@ mkRoutes' = D.toDispatch . mkRoutes
 -- > mkRoute $ Get "foo/bar" app
 -- > Route [Static "foo", Static "bar"] False (const $ Just app) 
 mkRoute :: Rule -> D.Route Application
-mkRoute (Get p a) = mkGenRoute (D.Static "GET") False p a
-mkRoute (Post p a) = mkGenRoute (D.Static "POST") False p a
-mkRoute (Head p a) = mkGenRoute (D.Static "HEAD") False p a
-mkRoute (Put p a) = mkGenRoute (D.Static "PUT") False p a
-mkRoute (Delete p a) = mkGenRoute (D.Static "DELETE") False p a
-mkRoute (Trace p a) = mkGenRoute (D.Static "TRACE") False p a
-mkRoute (Connect p a) = mkGenRoute (D.Static "CONNECT") False p a
-mkRoute (Options p a) = mkGenRoute (D.Static "OPTIONS") False p a
-mkRoute (Any p a) = mkGenRoute D.Dynamic False p a
-mkRoute (Get' p a) = mkGenRoute (D.Static "GET") True p a
-mkRoute (Post' p a) = mkGenRoute (D.Static "POST") True p a
-mkRoute (Head' p a) = mkGenRoute (D.Static "HEAD") True p a
-mkRoute (Put' p a) = mkGenRoute (D.Static "PUT") True p a
-mkRoute (Delete' p a) = mkGenRoute (D.Static "DELETE") True p a
-mkRoute (Trace' p a) = mkGenRoute (D.Static "TRACE") True p a
-mkRoute (Connect' p a) = mkGenRoute (D.Static "CONNECT") True p a
-mkRoute (Options' p a) = mkGenRoute (D.Static "OPTIONS") True p a
-mkRoute (Any' p a) = mkGenRoute D.Dynamic True p a
-mkRoute (Gen v m p a) = mkGenRoute (D.Static m) v p a
+mkRoute (Get p a) = mkGenRoute (D.Static "GET") p a
+mkRoute (Post p a) = mkGenRoute (D.Static "POST") p a
+mkRoute (Head p a) = mkGenRoute (D.Static "HEAD") p a
+mkRoute (Put p a) = mkGenRoute (D.Static "PUT") p a
+mkRoute (Delete p a) = mkGenRoute (D.Static "DELETE") p a
+mkRoute (Trace p a) = mkGenRoute (D.Static "TRACE") p a
+mkRoute (Connect p a) = mkGenRoute (D.Static "CONNECT") p a
+mkRoute (Options p a) = mkGenRoute (D.Static "OPTIONS") p a
+mkRoute (Any p a) = mkGenRoute D.Dynamic p a
+mkRoute (Gen m p a) = mkGenRoute (D.Static m) p a
 {-# INLINE mkRoute #-} 
 
 -- | Make generic route
 mkGenRoute :: 
        D.Piece      -- ^ Method piece. 'D.Dynamic' means any method. 
-    -> Bool         -- ^ 'D.rhHasMulti'
     -> T.Text         -- ^ Path pieces
     -> Application  -- ^ Routed application
     -> D.Route Application
-mkGenRoute m hasMulti pieces = 
-    D.Route (m:mkPieces pieces) hasMulti . const . Just 
+mkGenRoute m path =
+    let (!pieces, !hasMulti) = mkPieces path in
+    D.Route (m:pieces) hasMulti . const . Just 
 {-# INLINE mkGenRoute #-}
 
--- | Make Pieces from path
-mkPieces :: T.Text -> [D.Piece]
-mkPieces = 
-    map chunk . protPath . T.split (=='/')
+-- | Parse 'T.Text' and make tuple with 'D.Piece's and 'D.hasMulti'. 
+--   
+-- > ""         -- ([], False)
+-- > "*"        -- ([], True)
+-- > "foo/#"    -- ([Static "foo", Dynamic], False)  
+-- > "foo/#/*"  -- ([Static "foo", Dynamic], True)  
+mkPieces :: 
+       T.Text               -- ^ Path to parse 
+    -> ([D.Piece], Bool)    -- ^ list of 'D.Piece's and 'D.hasMulti'
+mkPieces "" = ([], False) 
+mkPieces !t = 
+    if T.last t == '*' 
+        then (prep . T.init $ t, True)
+        else (prep t, False)
   where
-    protPath [""] = []
-    protPath p = p
-    chunk "" = D.Dynamic
+    prep = map chunk . filter (/="") . T.split (=='/')
+    {-# INLINE prep #-} 
+    -- | Convert chunk
+    chunk "#" = D.Dynamic
     chunk c = D.Static c
-{-# INLINE mkPieces #-}
+    {-# INLINE chunk #-} 
+{-# INLINE mkPieces #-} 
 
 -----------------------------------------------------------------------------
 -- Middleware.
