@@ -45,6 +45,9 @@ caseRoute = flip runSession routedApp $ do
     testOne "last/bar/baz"          "#/#/#"
     testOne "will/never/be/routed"  "noroute"
     
+    -- Weird \"Last slash\" behaviour
+    testOne "foo/bar/"              "foo/bar"
+    
     -- test @POST@
     rPost <- request $ setRawPathInfo 
             defaultRequest {requestMethod="POST"} "foo/bar" 
@@ -58,7 +61,7 @@ caseRoute = flip runSession routedApp $ do
 -- | Routed application
 routedApp :: Application
 routedApp = 
-    dispatch mappings $ testApp "noroute"
+    dispatch_ mappings $ testApp "noroute"
   where
     mappings = mkRoutes' [
           Get ""            $ testApp ""

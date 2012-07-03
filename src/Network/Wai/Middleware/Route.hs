@@ -15,7 +15,8 @@ module Network.Wai.Middleware.Route (
     mkRoute,
     
     -- * Middleware
-    dispatch
+    dispatch,
+    dispatch_
 ) where
 
 import Control.Applicative ((<$>), (<*>))
@@ -140,7 +141,7 @@ mkPieces !t =
 -- Middleware.
 -----------------------------------------------------------------------------
 
--- | Dispatch function.
+-- | Dispatch 'Middleware'. 
 -- 
 -- > rs :: Dispatch Application
 -- > rs = toDispatch . mkRoutes [
@@ -152,21 +153,36 @@ mkPieces !t =
 -- >    ]
 -- > 
 -- > app :: Application
--- > app = dispatch rs (error "Not dispatched")
-
+-- > app = dispatch True rs (error "Not dispatched")
 dispatch :: 
-       D.Dispatch Application   
+       Bool 
+            -- ^ Squash empty 'pathInfo' chunks. It often appear in the 
+            --   presence of double slashes or \"Ending slash\" in URL.
+    -> D.Dispatch Application   
             -- ^ Dispatch function. 
-            --   Use 'D.toDispatch' and route helpers below.
+            --   Use 'D.toDispatch' and route helpers.
     -> Application 
             -- ^ Default (@404@) application. 
     -> Application
-dispatch mappings defApp req = 
+dispatch squash mappings defApp req = 
     case mappings . needle $ req of
         Nothing -> defApp req
         (Just app) -> app req 
   where
-    needle = (:) <$> decodeUtf8 . requestMethod <*> pathInfo
+    needle = (:) <$> decodeUtf8 . requestMethod <*> path squash
+    path False = pathInfo
+    path True = filter (/="") . pathInfo
+
+-- | Dispatch 'Middleware' with auto-squash empty path pieces. Equiwalent to
+-- > dispatch True
+dispatch_ ::
+       D.Dispatch Application   
+            -- ^ Dispatch function. 
+            --   Use 'D.toDispatch' and route helpers.
+    -> Application 
+            -- ^ Default (@404@) application. 
+    -> Application
+dispatch_ = dispatch True
 
 
 
