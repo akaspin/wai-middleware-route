@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
@@ -77,7 +78,11 @@ routedApp =
 -- | Simple test application
 testApp :: BL.ByteString -> Application
 testApp answer _req = 
+#if MIN_VERSION_wai(3, 0, 0)
+    ($ responseLBS H.ok200 [] answer)
+#else
     return $ responseLBS H.ok200 [] answer
+#endif
 
 -- | Default request
 mkRequest :: B.ByteString -> Session SResponse
